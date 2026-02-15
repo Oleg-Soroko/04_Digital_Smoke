@@ -1,15 +1,19 @@
 # Digital Smoke
 
-Interactive GPU fluid smoke tool built with Three.js, TypeScript, and Vite.
+Interactive GPU fluid smoke playground built with Three.js, TypeScript, and Vite.
+The current version focuses on image/video-driven smoke shaping, point + ASCII rendering,
+and fast live tuning from a compact control panel.
 
 ## Features
 
-- 2D GPU fluid simulation with turbulence and vorticity
-- Image/video seeded smoke source
-- Point-cloud and ASCII styled rendering mix
-- Mouse interaction for white/black smoke injection
-- Tilt/parallax interaction panel controls
-- PNG export from UI
+- 2D GPU fluid simulation with turbulence, vorticity, pressure solve, and advection controls
+- Seed input pipeline: load image, load video, or switch back to default source
+- Point + ASCII hybrid rendering with selectable styles (`Dust`, `Glitch`)
+- Look controls for `Seed Distortion`, `Image Contrast`, `Hue`, and `Temperature`
+- Pointer-reactive smoke with `Pointer Force`, `Pointer Scale`, and `Pointer Trail`
+- Plane interaction controls (tilt/parallax follow)
+- Reliable PNG export directly from the UI (`Export PNG`)
+- Updated default preset tuned to the current UI setup
 
 ## Stack
 
@@ -19,6 +23,8 @@ Interactive GPU fluid smoke tool built with Three.js, TypeScript, and Vite.
 - `typescript`
 
 ## Run
+
+Getting started:
 
 ```bash
 npm install
@@ -36,18 +42,19 @@ npm run preview
 
 - `LMB` drag: white smoke
 - `RMB` drag: black smoke
+- `Mouse wheel`: subtle plane zoom
 - `Space`: pause/resume
 - `R`: reset seed
 - `P`: screenshot PNG
 
 ## UI Folders
 
-- `Input Output`: load image/video seed, use default seed, export PNG
-- `Look`: seed distortion/color and global look tuning
-- `Points + ASCII`: point/ASCII style controls
-- `Simulation`: solver and fluid behavior
-- `Interaction`: plane tilt/parallax response
-- `Reset`: reset params and random seed
+- `Input Output`: `Load Image...`, `Load Video...`, `Use Default`, `Export PNG`
+- `Look`: seed distortion and look shaping, pointer force/scale/trail, point style
+- `Points + ASCII`: image-point response and ASCII density/jitter/flow controls
+- `Simulation`: core fluid solver and persistence tuning
+- `Interaction`: plane tilt and parallax motion response
+- `Reset`: `Reset Params` and `Random Seed`
 
 ## Project
 
