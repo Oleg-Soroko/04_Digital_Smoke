@@ -36,6 +36,12 @@ let activeSeed = 781237;
 let paused = false;
 let simTime = 0;
 let useLegacyTilt = false;
+let seedMorphTarget = 0;
+let seedMorphCurrent = 0;
+const SCROLL_ZOOM_MIN = 0.1;
+const SCROLL_ZOOM_MAX = 0.3;
+let scrollZoomTarget = SCROLL_ZOOM_MIN;
+let scrollZoomCurrent = SCROLL_ZOOM_MIN;
 
 const smoke: SmokeSystem = createSmokeSystem(
   renderer,
@@ -45,6 +51,55 @@ const smoke: SmokeSystem = createSmokeSystem(
   viewport.clientWidth,
   viewport.clientHeight
 );
+
+const seedImageInput = document.createElement("input");
+seedImageInput.type = "file";
+seedImageInput.accept = "image/png,image/jpeg,image/webp,image/bmp,image/gif";
+seedImageInput.style.display = "none";
+app.appendChild(seedImageInput);
+
+const seedVideoInput = document.createElement("input");
+seedVideoInput.type = "file";
+seedVideoInput.accept = "video/mp4,video/webm,video/ogg";
+seedVideoInput.style.display = "none";
+app.appendChild(seedVideoInput);
+
+async function onSeedImageInputChange(): Promise<void> {
+  const file = seedImageInput.files?.[0];
+  seedImageInput.value = "";
+  if (!file) {
+    return;
+  }
+
+  try {
+    await smoke.setSeedImageFromFile(file);
+  } catch (error) {
+    console.error("[DigitalSmoke] Failed to load selected image.", error);
+  }
+}
+
+seedImageInput.addEventListener("change", () => {
+  void onSeedImageInputChange();
+});
+
+async function onSeedVideoInputChange(): Promise<void> {
+  const file = seedVideoInput.files?.[0];
+  seedVideoInput.value = "";
+  if (!file) {
+    return;
+  }
+
+  try {
+    await smoke.setSeedVideoFromFile(file);
+    seedMorphTarget = 0;
+  } catch (error) {
+    console.error("[DigitalSmoke] Failed to load selected video.", error);
+  }
+}
+
+seedVideoInput.addEventListener("change", () => {
+  void onSeedVideoInputChange();
+});
 
 const pointerState: PointerState = {
   active: false,
@@ -83,6 +138,26 @@ ui = createControlsPanel(activeParams, activeSeed, {
 
   onTiltLegacyChange(legacy) {
     useLegacyTilt = legacy;
+  },
+
+  onSeedMorphChange(value) {
+    seedMorphTarget = Math.min(1, Math.max(0, value));
+  },
+
+  onPickSeedImage() {
+    seedImageInput.click();
+  },
+
+  onPickSeedVideo() {
+    seedVideoInput.click();
+  },
+
+  onUseDefaultSeedImage() {
+    smoke.useDefaultSeedImage();
+  },
+
+  onUseDefaultSeedVideo() {
+    smoke.useDefaultSeedVideo();
   },
 
   onScreenshot() {
@@ -129,40 +204,39 @@ let viewTiltY = 0;
 let viewTiltR = 0;
 let viewShiftX = 0;
 let viewShiftY = 0;
+let viewScale = 1;
 
 function applyViewportTilt(dt: number): void {
   const planeTilt = activeParams.planeTilt;
-  if (planeTilt <= 0.0001) {
-    viewTiltX = 0;
-    viewTiltY = 0;
-    viewTiltR = 0;
-    viewShiftX = 0;
-    viewShiftY = 0;
-    viewport.style.transform = "none";
-    return;
+  let targetX = 0;
+  let targetY = 0;
+  let targetR = 0;
+  let targetShiftX = 0;
+  let targetShiftY = 0;
+
+  if (planeTilt > 0.0001) {
+    const nx = (pointerState.x - 0.5) * 2.0;
+    const ny = (pointerState.y - 0.5) * 2.0;
+    const dead = 0.02;
+    const map = (v: number): number => {
+      const s = Math.sign(v);
+      const a = Math.abs(v);
+      if (a <= dead) {
+        return 0;
+      }
+      const t = (a - dead) / (1 - dead);
+      return s * Math.pow(t, 0.8);
+    };
+
+    const lx = map(nx);
+    const ly = map(ny);
+    const tiltDeg = planeTilt * 52.0;
+    targetX = (useLegacyTilt ? -ly : ly) * tiltDeg * 0.88;
+    targetY = lx * tiltDeg;
+    targetR = (useLegacyTilt ? 1 : -1) * lx * ly * tiltDeg * 0.15;
+    targetShiftX = -lx * planeTilt * 54.0;
+    targetShiftY = (useLegacyTilt ? 1 : -1) * ly * planeTilt * 42.0;
   }
-
-  const nx = (pointerState.x - 0.5) * 2.0;
-  const ny = (pointerState.y - 0.5) * 2.0;
-  const dead = 0.02;
-  const map = (v: number): number => {
-    const s = Math.sign(v);
-    const a = Math.abs(v);
-    if (a <= dead) {
-      return 0;
-    }
-    const t = (a - dead) / (1 - dead);
-    return s * Math.pow(t, 0.8);
-  };
-
-  const lx = map(nx);
-  const ly = map(ny);
-  const tiltDeg = planeTilt * 52.0;
-  const targetX = (useLegacyTilt ? -ly : ly) * tiltDeg * 0.88;
-  const targetY = lx * tiltDeg;
-  const targetR = (useLegacyTilt ? 1 : -1) * lx * ly * tiltDeg * 0.15;
-  const targetShiftX = -lx * planeTilt * 54.0;
-  const targetShiftY = (useLegacyTilt ? 1 : -1) * ly * planeTilt * 42.0;
   const follow = 1 - Math.exp(-dt * Math.max(0.5, activeParams.planeTiltEase) * 2.2);
 
   viewTiltX = THREE.MathUtils.lerp(viewTiltX, targetX, follow);
@@ -172,7 +246,22 @@ function applyViewportTilt(dt: number): void {
   viewShiftY = THREE.MathUtils.lerp(viewShiftY, targetShiftY, follow);
 
   const baseScale = 1.0 - planeTilt * 0.06;
-  viewport.style.transform = `perspective(1300px) translate3d(${viewShiftX.toFixed(2)}px, ${viewShiftY.toFixed(2)}px, 0px) rotateX(${viewTiltX.toFixed(3)}deg) rotateY(${viewTiltY.toFixed(3)}deg) rotateZ(${viewTiltR.toFixed(3)}deg) scale(${baseScale.toFixed(4)})`;
+  const zoomFollow = 1 - Math.exp(-dt * 9.0);
+  scrollZoomCurrent = THREE.MathUtils.lerp(scrollZoomCurrent, scrollZoomTarget, zoomFollow);
+  const targetScale = THREE.MathUtils.clamp(baseScale + scrollZoomCurrent, 0.95, 1.45);
+  viewScale = THREE.MathUtils.lerp(viewScale, targetScale, zoomFollow);
+
+  viewport.style.transform = `perspective(1300px) translate3d(${viewShiftX.toFixed(2)}px, ${viewShiftY.toFixed(2)}px, 0px) rotateX(${viewTiltX.toFixed(3)}deg) rotateY(${viewTiltY.toFixed(3)}deg) rotateZ(${viewTiltR.toFixed(3)}deg) scale(${viewScale.toFixed(4)})`;
+}
+
+function onViewportWheel(event: WheelEvent): void {
+  event.preventDefault();
+  const delta = THREE.MathUtils.clamp(-event.deltaY * 0.00055, -0.03, 0.03);
+  scrollZoomTarget = THREE.MathUtils.clamp(
+    scrollZoomTarget + delta,
+    SCROLL_ZOOM_MIN,
+    SCROLL_ZOOM_MAX
+  );
 }
 
 function onPointerDown(event: PointerEvent): void {
@@ -234,6 +323,9 @@ function animate(): void {
 
   const dt = Math.min(clock.getDelta(), 0.05);
   applyViewportTilt(dt);
+  const morphFollow = 1 - Math.exp(-dt * 4.0);
+  seedMorphCurrent = THREE.MathUtils.lerp(seedMorphCurrent, seedMorphTarget, morphFollow);
+  smoke.setSeedMorph(seedMorphCurrent);
   smoke.setPointer(pointerState);
 
   if (!paused) {
@@ -282,6 +374,7 @@ window.addEventListener("pointerup", onPointerUp);
 window.addEventListener("pointercancel", onPointerUp);
 renderer.domElement.addEventListener("pointerleave", onPointerLeave);
 renderer.domElement.addEventListener("contextmenu", onContextMenu);
+renderer.domElement.addEventListener("wheel", onViewportWheel, { passive: false });
 animate();
 
 function dispose(): void {
@@ -301,6 +394,9 @@ function dispose(): void {
   renderer.domElement.removeEventListener("pointerdown", onPointerDown);
   renderer.domElement.removeEventListener("pointerleave", onPointerLeave);
   renderer.domElement.removeEventListener("contextmenu", onContextMenu);
+  renderer.domElement.removeEventListener("wheel", onViewportWheel);
+  seedImageInput.remove();
+  seedVideoInput.remove();
 
   ui.dispose();
   smoke.dispose();

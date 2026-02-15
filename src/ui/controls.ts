@@ -7,6 +7,11 @@ export interface SmokeControlCallbacks {
   onResetSeed(seed: number): void;
   onResetParams(next: SmokeParams): void;
   onTiltLegacyChange(legacy: boolean): void;
+  onSeedMorphChange(value: number): void;
+  onPickSeedImage(): void;
+  onPickSeedVideo(): void;
+  onUseDefaultSeedImage(): void;
+  onUseDefaultSeedVideo(): void;
   onScreenshot(): void;
 }
 
@@ -20,6 +25,7 @@ type UiState = SmokeParams & {
   paused: boolean;
   seed: number;
   tiltLegacy: boolean;
+  seedMorph: number;
 };
 
 const MAX_SEED = 2147483646;
@@ -36,7 +42,8 @@ export function createControlsPanel(
     ...initialParams,
     paused: false,
     seed: Math.max(1, Math.floor(initialSeed)),
-    tiltLegacy: Boolean(initialTiltLegacy)
+    tiltLegacy: Boolean(initialTiltLegacy),
+    seedMorph: 0
   };
 
   const gui = new GUI({
@@ -87,6 +94,51 @@ export function createControlsPanel(
   addParamController(imageFolder, "seedInfluence", "Seed Influence");
   addParamController(imageFolder, "seedContrast", "Image Contrast");
   addParamController(imageFolder, "seedColorFilter", "Color Filter");
+  const imageActions = {
+    loadImage: () => {
+      callbacks.onPickSeedImage();
+    },
+    loadVideo: () => {
+      callbacks.onPickSeedVideo();
+      state.seedMorph = 0;
+      seedMorphController.updateDisplay();
+      callbacks.onSeedMorphChange(0);
+    },
+    useDefaultImage: () => {
+      callbacks.onUseDefaultSeedImage();
+      state.seedMorph = 0;
+      seedMorphController.updateDisplay();
+      callbacks.onSeedMorphChange(0);
+    },
+    useVideoLoop: () => {
+      callbacks.onUseDefaultSeedVideo();
+      state.seedMorph = 0;
+      seedMorphController.updateDisplay();
+      callbacks.onSeedMorphChange(0);
+    },
+    morphToA: () => {
+      state.seedMorph = 0;
+      seedMorphController.updateDisplay();
+      callbacks.onSeedMorphChange(0);
+    },
+    morphToB: () => {
+      state.seedMorph = 1;
+      seedMorphController.updateDisplay();
+      callbacks.onSeedMorphChange(1);
+    }
+  };
+  const seedMorphController = imageFolder.add(state, "seedMorph", 0, 1, 0.001).name("Seed Morph");
+  seedMorphController.onChange((value: number) => {
+    const normalized = Math.min(1, Math.max(0, value));
+    state.seedMorph = normalized;
+    callbacks.onSeedMorphChange(normalized);
+  });
+  imageFolder.add(imageActions, "loadImage").name("Load Image...");
+  imageFolder.add(imageActions, "loadVideo").name("Load Video...");
+  imageFolder.add(imageActions, "useDefaultImage").name("Use Default");
+  imageFolder.add(imageActions, "useVideoLoop").name("Use Video Loop");
+  imageFolder.add(imageActions, "morphToA").name("Morph To A");
+  imageFolder.add(imageActions, "morphToB").name("Morph To B");
 
   const imagePointsFolder = gui.addFolder("Image Points");
   addParamController(imagePointsFolder, "seedPointBrightness", "Point Bright");
@@ -172,6 +224,9 @@ export function createControlsPanel(
 
       state.paused = false;
       pauseController.updateDisplay();
+      state.seedMorph = 0;
+      seedMorphController.updateDisplay();
+      callbacks.onSeedMorphChange(0);
 
       callbacks.onResetParams({ ...defaults });
       callbacks.onPauseChange(false);

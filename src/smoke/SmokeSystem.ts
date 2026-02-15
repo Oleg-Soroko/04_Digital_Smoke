@@ -13,6 +13,17 @@ const DEFAULT_SEED_IMAGE_CANDIDATES = [
   "seed.jpg",
   "seed.jpeg"
 ];
+const DEFAULT_SEED_VIDEO_CANDIDATES = [
+  "seed-default_03.mp4",
+  "seed-default_03.webm",
+  "seed.mp4",
+  "seed.webm"
+];
+const DEFAULT_SEED_MORPH_CANDIDATES = [
+  "seed-default_02.png",
+  "seed-default_02.jpg",
+  "seed-default_02.jpeg"
+];
 
 function normalizePersistenceSlider(value: number): number {
   const limits = SMOKE_PARAM_LIMITS.persistence;
@@ -179,9 +190,12 @@ varying vec2 vUv;
 uniform sampler2D uVelocity;
 uniform sampler2D uDensity;
 uniform sampler2D uSeedImage;
+uniform sampler2D uSeedImageMorph;
 uniform vec2 uTexel;
 uniform vec2 uResolution;
 uniform vec2 uSeedSize;
+uniform vec2 uSeedMorphSize;
+uniform float uSeedMorph;
 uniform float uDt;
 uniform float uBuoyancy;
 uniform float uDrag;
@@ -219,13 +233,13 @@ float noise2(vec2 p) {
   return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
 }
 
-vec2 toSeedUvContain(vec2 uv) {
-  if (uSeedSize.x < 1.0 || uSeedSize.y < 1.0) {
+vec2 toSeedUvContain(vec2 uv, vec2 seedSize) {
+  if (seedSize.x < 1.0 || seedSize.y < 1.0) {
     return vec2(-1.0);
   }
 
   float viewAspect = uResolution.x / max(uResolution.y, 1.0);
-  float seedAspect = uSeedSize.x / max(uSeedSize.y, 1.0);
+  float seedAspect = seedSize.x / max(seedSize.y, 1.0);
   vec2 suv = uv;
 
   if (viewAspect > seedAspect) {
@@ -243,14 +257,30 @@ vec2 toSeedUvContain(vec2 uv) {
   return suv;
 }
 
-float sampleSeedContain(vec2 uv) {
-  vec2 suv = toSeedUvContain(uv);
+float sampleSeedA(vec2 uv) {
+  vec2 suv = toSeedUvContain(uv, uSeedSize);
   if (suv.x < 0.0 || suv.y < 0.0) {
     return 0.0;
   }
 
   vec3 seedRgb = texture2D(uSeedImage, suv).rgb;
-  float seedLuma = dot(seedRgb, vec3(0.299, 0.587, 0.114));
+  return dot(seedRgb, vec3(0.299, 0.587, 0.114));
+}
+
+float sampleSeedB(vec2 uv, float fallback) {
+  vec2 suv = toSeedUvContain(uv, uSeedMorphSize);
+  if (suv.x < 0.0 || suv.y < 0.0) {
+    return fallback;
+  }
+
+  vec3 seedRgb = texture2D(uSeedImageMorph, suv).rgb;
+  return dot(seedRgb, vec3(0.299, 0.587, 0.114));
+}
+
+float sampleSeedContain(vec2 uv) {
+  float seedA = sampleSeedA(uv);
+  float seedB = sampleSeedB(uv, seedA);
+  float seedLuma = mix(seedA, seedB, clamp(uSeedMorph, 0.0, 1.0));
   return clamp((seedLuma - 0.5) * uSeedContrast + 0.5, 0.0, 1.0);
 }
 
@@ -575,9 +605,11 @@ uniform sampler2D uDensity;
 uniform sampler2D uAsciiAtlas;
 uniform sampler2D uVelocity;
 uniform sampler2D uSeedImage;
+uniform sampler2D uSeedImageMorph;
 uniform vec2 uTexel;
 uniform vec2 uResolution;
 uniform vec2 uSeedSize;
+uniform vec2 uSeedMorphSize;
 uniform vec2 uPointerUv;
 uniform float uTime;
 uniform float uOpacity;
@@ -607,6 +639,7 @@ uniform float uSeedPointSize;
 uniform float uSeedPointContrast;
 uniform float uSeedPointerInfluence;
 uniform float uSeedVisible;
+uniform float uSeedMorph;
 uniform float uSeedBgOpacity;
 uniform float uPointerRadius;
 uniform float uPointerActive;
@@ -621,13 +654,13 @@ vec2 decodeVelocity(vec4 c) {
   return c.xy * 2.0 - 1.0;
 }
 
-vec2 toSeedUvContain(vec2 uv) {
-  if (uSeedVisible < 0.5 || uSeedSize.x < 1.0 || uSeedSize.y < 1.0) {
+vec2 toSeedUvContain(vec2 uv, vec2 seedSize) {
+  if (uSeedVisible < 0.5 || seedSize.x < 1.0 || seedSize.y < 1.0) {
     return vec2(-1.0);
   }
 
   float viewAspect = uResolution.x / max(uResolution.y, 1.0);
-  float seedAspect = uSeedSize.x / max(uSeedSize.y, 1.0);
+  float seedAspect = seedSize.x / max(seedSize.y, 1.0);
   vec2 suv = uv;
 
   if (viewAspect > seedAspect) {
@@ -645,14 +678,30 @@ vec2 toSeedUvContain(vec2 uv) {
   return suv;
 }
 
-float sampleSeedContain(vec2 uv) {
-  vec2 suv = toSeedUvContain(uv);
+float sampleSeedA(vec2 uv) {
+  vec2 suv = toSeedUvContain(uv, uSeedSize);
   if (suv.x < 0.0 || suv.y < 0.0) {
     return 0.0;
   }
 
   vec3 seedRgb = texture2D(uSeedImage, suv).rgb;
-  float seedLuma = dot(seedRgb, vec3(0.299, 0.587, 0.114));
+  return dot(seedRgb, vec3(0.299, 0.587, 0.114));
+}
+
+float sampleSeedB(vec2 uv, float fallback) {
+  vec2 suv = toSeedUvContain(uv, uSeedMorphSize);
+  if (suv.x < 0.0 || suv.y < 0.0) {
+    return fallback;
+  }
+
+  vec3 seedRgb = texture2D(uSeedImageMorph, suv).rgb;
+  return dot(seedRgb, vec3(0.299, 0.587, 0.114));
+}
+
+float sampleSeedContain(vec2 uv) {
+  float seedA = sampleSeedA(uv);
+  float seedB = sampleSeedB(uv, seedA);
+  float seedLuma = mix(seedA, seedB, clamp(uSeedMorph, 0.0, 1.0));
   return clamp((seedLuma - 0.5) * uSeedContrast + 0.5, 0.0, 1.0);
 }
 
@@ -966,6 +1015,10 @@ void main() {
   vec3 seedColor = vec3(clamp(seedGlow * uSeedPointBrightness, 0.0, 1.0)) * uSeedBgOpacity * pointFilter;
   color = max(color, seedColor);
 
+  float edgeDist = min(min(vUv.x, 1.0 - vUv.x), min(vUv.y, 1.0 - vUv.y));
+  float edgeFade = smoothstep(0.02, 0.14, edgeDist);
+  color *= edgeFade;
+
   color = clamp(color * uOpacity, 0.0, 1.0);
   gl_FragColor = vec4(color, 1.0);
 }
@@ -992,19 +1045,22 @@ varying vec2 vUv;
 
 uniform sampler2D uDensity;
 uniform sampler2D uSeed;
+uniform sampler2D uSeedMorphTex;
 uniform float uAmount;
 uniform float uSoftness;
 uniform float uSeedContrast;
+uniform float uSeedMorph;
 uniform vec2 uViewport;
 uniform vec2 uSeedSize;
+uniform vec2 uSeedMorphSize;
 
-float sampleSeedContain(vec2 uv) {
-  if (uSeedSize.x < 1.0 || uSeedSize.y < 1.0) {
-    return 0.0;
+vec2 toSeedUvContain(vec2 uv, vec2 seedSize) {
+  if (seedSize.x < 1.0 || seedSize.y < 1.0) {
+    return vec2(-1.0);
   }
 
   float viewAspect = uViewport.x / max(uViewport.y, 1.0);
-  float seedAspect = uSeedSize.x / max(uSeedSize.y, 1.0);
+  float seedAspect = seedSize.x / max(seedSize.y, 1.0);
   vec2 suv = uv;
 
   if (viewAspect > seedAspect) {
@@ -1016,11 +1072,36 @@ float sampleSeedContain(vec2 uv) {
   }
 
   if (suv.x < 0.0 || suv.x > 1.0 || suv.y < 0.0 || suv.y > 1.0) {
+    return vec2(-1.0);
+  }
+
+  return suv;
+}
+
+float sampleSeedA(vec2 uv) {
+  vec2 suv = toSeedUvContain(uv, uSeedSize);
+  if (suv.x < 0.0 || suv.y < 0.0) {
     return 0.0;
   }
 
   vec3 seedRgb = texture2D(uSeed, suv).rgb;
-  float seedLuma = dot(seedRgb, vec3(0.299, 0.587, 0.114));
+  return dot(seedRgb, vec3(0.299, 0.587, 0.114));
+}
+
+float sampleSeedB(vec2 uv, float fallback) {
+  vec2 suv = toSeedUvContain(uv, uSeedMorphSize);
+  if (suv.x < 0.0 || suv.y < 0.0) {
+    return fallback;
+  }
+
+  vec3 seedRgb = texture2D(uSeedMorphTex, suv).rgb;
+  return dot(seedRgb, vec3(0.299, 0.587, 0.114));
+}
+
+float sampleSeedContain(vec2 uv) {
+  float seedA = sampleSeedA(uv);
+  float seedB = sampleSeedB(uv, seedA);
+  float seedLuma = mix(seedA, seedB, clamp(uSeedMorph, 0.0, 1.0));
   return clamp((seedLuma - 0.5) * uSeedContrast + 0.5, 0.0, 1.0);
 }
 
@@ -1172,6 +1253,12 @@ export interface SmokeSystem {
   update(dt: number, elapsed: number): void;
   setParams(next: Partial<SmokeParams>): void;
   setPointer(state: PointerState): void;
+  setSeedMorph(value: number): void;
+  setSeedImageFromFile(file: File): Promise<void>;
+  setSeedVideoFromFile(file: File): Promise<void>;
+  setSeedVideoMotion(speed: number): void;
+  useDefaultSeedImage(): void;
+  useDefaultSeedVideo(): void;
   reset(seed?: number): void;
   resize(width: number, height: number): void;
   dispose(): void;
@@ -1207,9 +1294,11 @@ export function createSmokeSystem(
       uAsciiAtlas: { value: asciiAtlasTexture },
       uVelocity: { value: null as THREE.Texture | null },
       uSeedImage: { value: null as THREE.Texture | null },
+      uSeedImageMorph: { value: null as THREE.Texture | null },
       uTexel: { value: new THREE.Vector2(1 / 512, 1 / 512) },
       uResolution: { value: new THREE.Vector2(Math.max(viewportWidth, 1), Math.max(viewportHeight, 1)) },
       uSeedSize: { value: new THREE.Vector2(1, 1) },
+      uSeedMorphSize: { value: new THREE.Vector2(1, 1) },
       uPointerUv: { value: new THREE.Vector2(0.5, 0.5) },
       uTime: { value: 0.0 },
       uOpacity: { value: state.opacity },
@@ -1243,6 +1332,7 @@ export function createSmokeSystem(
       uSeedPointContrast: { value: state.seedPointContrast },
       uSeedPointerInfluence: { value: state.seedPointerInfluence },
       uSeedVisible: { value: 0.0 },
+      uSeedMorph: { value: 0.0 },
       uSeedBgOpacity: { value: 1.0 },
       uPointerRadius: { value: state.pointerRadius },
       uPointerActive: { value: 0.0 }
@@ -1273,11 +1363,14 @@ export function createSmokeSystem(
     uniforms: {
       uDensity: { value: null as THREE.Texture | null },
       uSeed: { value: null as THREE.Texture | null },
+      uSeedMorphTex: { value: null as THREE.Texture | null },
       uAmount: { value: 0.82 },
       uSoftness: { value: 0.0 },
       uSeedContrast: { value: state.seedContrast },
+      uSeedMorph: { value: 0.0 },
       uViewport: { value: new THREE.Vector2(1, 1) },
-      uSeedSize: { value: new THREE.Vector2(1, 1) }
+      uSeedSize: { value: new THREE.Vector2(1, 1) },
+      uSeedMorphSize: { value: new THREE.Vector2(1, 1) }
     },
     vertexShader: createVertexShader(),
     fragmentShader: createSeedDensityFragment(),
@@ -1322,9 +1415,12 @@ export function createSmokeSystem(
       uVelocity: { value: null as THREE.Texture | null },
       uDensity: { value: null as THREE.Texture | null },
       uSeedImage: { value: null as THREE.Texture | null },
+      uSeedImageMorph: { value: null as THREE.Texture | null },
       uTexel: { value: new THREE.Vector2(1 / 512, 1 / 512) },
       uResolution: { value: new THREE.Vector2(1, 1) },
       uSeedSize: { value: new THREE.Vector2(0, 0) },
+      uSeedMorphSize: { value: new THREE.Vector2(0, 0) },
+      uSeedMorph: { value: 0.0 },
       uDt: { value: 0.016 },
       uBuoyancy: { value: state.buoyancy },
       uDrag: { value: state.drag },
@@ -1455,6 +1551,12 @@ export function createSmokeSystem(
   let disposed = false;
   let currentSeed = normalizeSeed(seed);
   let seedImageTexture: THREE.Texture | null = null;
+  let seedMorphTexture: THREE.Texture | null = null;
+  let seedVideoTexture: THREE.VideoTexture | null = null;
+  let seedVideoElement: HTMLVideoElement | null = null;
+  let seedVideoObjectUrl: string | null = null;
+  let seedVideoMotion = 1;
+  let seedMorphAmount = 0;
 
   const seededRng = new SeededRandom(currentSeed);
   const pointer: PointerState = {
@@ -1579,75 +1681,427 @@ export function createSmokeSystem(
     swap(density);
   }
 
-  function loadDefaultSeedImage(): void {
-    const loader = new THREE.TextureLoader();
+  function clearSeedImageBindings(): void {
+    if (seedImageTexture && seedImageTexture !== seedVideoTexture) {
+      seedImageTexture.dispose();
+    }
+    seedImageTexture = null;
+    if (seedMorphTexture && seedMorphTexture !== seedVideoTexture) {
+      seedMorphTexture.dispose();
+    }
+    seedMorphTexture = null;
+    if (seedVideoTexture) {
+      seedVideoTexture.dispose();
+      seedVideoTexture = null;
+    }
+    if (seedVideoElement) {
+      seedVideoElement.pause();
+      seedVideoElement.removeAttribute("src");
+      seedVideoElement.load();
+      seedVideoElement = null;
+    }
+    if (seedVideoObjectUrl) {
+      URL.revokeObjectURL(seedVideoObjectUrl);
+      seedVideoObjectUrl = null;
+    }
+
+    displayMaterial.uniforms.uSeedImage.value = null;
+    displayMaterial.uniforms.uSeedImageMorph.value = null;
+    displayMaterial.uniforms.uSeedVisible.value = 0.0;
+    displayMaterial.uniforms.uSeedSize.value.set(1, 1);
+    displayMaterial.uniforms.uSeedMorphSize.value.set(1, 1);
+    seedDensityMaterial.uniforms.uSeed.value = null;
+    seedDensityMaterial.uniforms.uSeedMorphTex.value = null;
+    seedDensityMaterial.uniforms.uSeedSize.value.set(1, 1);
+    seedDensityMaterial.uniforms.uSeedMorphSize.value.set(1, 1);
+    forcesMaterial.uniforms.uSeedImage.value = null;
+    forcesMaterial.uniforms.uSeedImageMorph.value = null;
+    forcesMaterial.uniforms.uSeedSize.value.set(0, 0);
+    forcesMaterial.uniforms.uSeedMorphSize.value.set(0, 0);
+    seedMorphAmount = 0;
+    displayMaterial.uniforms.uSeedMorph.value = 0;
+    seedDensityMaterial.uniforms.uSeedMorph.value = 0;
+    forcesMaterial.uniforms.uSeedMorph.value = 0;
+  }
+
+  function getTextureSize(texture: THREE.Texture): { width: number; height: number } {
+    const image = texture.image as { width?: number; height?: number; videoWidth?: number; videoHeight?: number };
+    const width = Math.max(1, Number(image.videoWidth ?? image.width ?? 1));
+    const height = Math.max(1, Number(image.videoHeight ?? image.height ?? 1));
+    return { width, height };
+  }
+
+  function configureSeedTexture(texture: THREE.Texture): void {
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    texture.wrapS = THREE.ClampToEdgeWrapping;
+    texture.wrapT = THREE.ClampToEdgeWrapping;
+    texture.generateMipmaps = false;
+    texture.needsUpdate = true;
+  }
+
+  function syncMorphFallbackToBase(): void {
+    if (!seedImageTexture || seedMorphTexture) {
+      return;
+    }
+
+    const size = getTextureSize(seedImageTexture);
+    displayMaterial.uniforms.uSeedImageMorph.value = seedImageTexture;
+    displayMaterial.uniforms.uSeedMorphSize.value.set(size.width, size.height);
+    seedDensityMaterial.uniforms.uSeedMorphTex.value = seedImageTexture;
+    seedDensityMaterial.uniforms.uSeedMorphSize.value.set(size.width, size.height);
+    forcesMaterial.uniforms.uSeedImageMorph.value = seedImageTexture;
+    forcesMaterial.uniforms.uSeedMorphSize.value.set(size.width, size.height);
+  }
+
+  function applySeedMorphAmount(value: number): void {
+    seedMorphAmount = THREE.MathUtils.clamp(value, 0, 1);
+    displayMaterial.uniforms.uSeedMorph.value = seedMorphAmount;
+    seedDensityMaterial.uniforms.uSeedMorph.value = seedMorphAmount;
+    forcesMaterial.uniforms.uSeedMorph.value = seedMorphAmount;
+  }
+
+  function applySeedTexture(texture: THREE.Texture, sourceLabel: string): void {
+    if (disposed) {
+      texture.dispose();
+      return;
+    }
+
+    configureSeedTexture(texture);
+    const size = getTextureSize(texture);
+
+    if (seedVideoTexture) {
+      seedVideoTexture.dispose();
+      seedVideoTexture = null;
+    }
+    if (seedVideoElement) {
+      seedVideoElement.pause();
+      seedVideoElement.removeAttribute("src");
+      seedVideoElement.load();
+      seedVideoElement = null;
+    }
+    if (seedVideoObjectUrl) {
+      URL.revokeObjectURL(seedVideoObjectUrl);
+      seedVideoObjectUrl = null;
+    }
+    if (seedImageTexture) {
+      seedImageTexture.dispose();
+    }
+
+    seedImageTexture = texture;
+    displayMaterial.uniforms.uSeedImage.value = texture;
+    displayMaterial.uniforms.uSeedVisible.value = 1.0;
+    displayMaterial.uniforms.uSeedSize.value.set(size.width, size.height);
+    seedDensityMaterial.uniforms.uSeed.value = texture;
+    seedDensityMaterial.uniforms.uSeedSize.value.set(size.width, size.height);
+    forcesMaterial.uniforms.uSeedImage.value = texture;
+    forcesMaterial.uniforms.uSeedSize.value.set(size.width, size.height);
+    syncMorphFallbackToBase();
+    resetState(currentSeed);
+    console.info(`[DigitalSmoke] Loaded seed image: ${sourceLabel}`);
+  }
+
+  function applySeedVideoTexture(
+    video: HTMLVideoElement,
+    texture: THREE.VideoTexture,
+    sourceLabel: string,
+    objectUrl?: string
+  ): void {
+    if (disposed) {
+      texture.dispose();
+      video.pause();
+      video.removeAttribute("src");
+      video.load();
+      return;
+    }
+
+    configureSeedTexture(texture);
+    const size = getTextureSize(texture);
+
+    if (seedImageTexture && seedImageTexture !== seedVideoTexture) {
+      seedImageTexture.dispose();
+    }
+    if (seedVideoTexture) {
+      seedVideoTexture.dispose();
+    }
+    if (seedVideoElement) {
+      seedVideoElement.pause();
+      seedVideoElement.removeAttribute("src");
+      seedVideoElement.load();
+    }
+    if (seedVideoObjectUrl) {
+      URL.revokeObjectURL(seedVideoObjectUrl);
+      seedVideoObjectUrl = null;
+    }
+
+    seedVideoElement = video;
+    seedVideoTexture = texture;
+    seedVideoObjectUrl = objectUrl ?? null;
+    seedImageTexture = texture;
+
+    displayMaterial.uniforms.uSeedImage.value = texture;
+    displayMaterial.uniforms.uSeedVisible.value = 1.0;
+    displayMaterial.uniforms.uSeedSize.value.set(size.width, size.height);
+    seedDensityMaterial.uniforms.uSeed.value = texture;
+    seedDensityMaterial.uniforms.uSeedSize.value.set(size.width, size.height);
+    forcesMaterial.uniforms.uSeedImage.value = texture;
+    forcesMaterial.uniforms.uSeedSize.value.set(size.width, size.height);
+
+    syncMorphFallbackToBase();
+    resetState(currentSeed);
+    console.info(`[DigitalSmoke] Loaded seed video: ${sourceLabel}`);
+  }
+
+  function applySeedMorphTexture(texture: THREE.Texture, sourceLabel: string): void {
+    if (disposed) {
+      texture.dispose();
+      return;
+    }
+
+    configureSeedTexture(texture);
+    const size = getTextureSize(texture);
+    if (seedMorphTexture) {
+      seedMorphTexture.dispose();
+    }
+    seedMorphTexture = texture;
+    displayMaterial.uniforms.uSeedImageMorph.value = texture;
+    displayMaterial.uniforms.uSeedMorphSize.value.set(size.width, size.height);
+    seedDensityMaterial.uniforms.uSeedMorphTex.value = texture;
+    seedDensityMaterial.uniforms.uSeedMorphSize.value.set(size.width, size.height);
+    forcesMaterial.uniforms.uSeedImageMorph.value = texture;
+    forcesMaterial.uniforms.uSeedMorphSize.value.set(size.width, size.height);
+    console.info(`[DigitalSmoke] Loaded morph seed image: ${sourceLabel}`);
+  }
+
+  function buildDefaultSeedImageUrls(): string[] {
     const baseUrl = import.meta.env.BASE_URL || "/";
     const prefix = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
-    const urls: string[] = [];
+    const urls = new Set<string>();
     for (const name of DEFAULT_SEED_IMAGE_CANDIDATES) {
-      urls.push(`${prefix}${name}`);
-      urls.push(`./${name}`);
-      urls.push(`/${name}`);
-      urls.push(name);
+      urls.add(`${prefix}${name}`);
+      urls.add(`./${name}`);
+      urls.add(`/${name}`);
+      urls.add(name);
     }
+    return Array.from(urls);
+  }
+
+  function buildDefaultSeedMorphUrls(): string[] {
+    const baseUrl = import.meta.env.BASE_URL || "/";
+    const prefix = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
+    const urls = new Set<string>();
+    for (const name of DEFAULT_SEED_MORPH_CANDIDATES) {
+      urls.add(`${prefix}${name}`);
+      urls.add(`./${name}`);
+      urls.add(`/${name}`);
+      urls.add(name);
+    }
+    return Array.from(urls);
+  }
+
+  function buildDefaultSeedVideoUrls(): string[] {
+    const baseUrl = import.meta.env.BASE_URL || "/";
+    const prefix = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
+    const urls = new Set<string>();
+    for (const name of DEFAULT_SEED_VIDEO_CANDIDATES) {
+      urls.add(`${prefix}${name}`);
+      urls.add(`./${name}`);
+      urls.add(`/${name}`);
+      urls.add(name);
+    }
+    return Array.from(urls);
+  }
+
+  function loadTextureFromUrl(url: string): Promise<THREE.Texture> {
+    return new Promise((resolve, reject) => {
+      const loader = new THREE.TextureLoader();
+      loader.load(
+        url,
+        (texture) => resolve(texture),
+        undefined,
+        (error) => reject(error)
+      );
+    });
+  }
+
+  function loadVideoTextureFromUrl(url: string): Promise<{ video: HTMLVideoElement; texture: THREE.VideoTexture }> {
+    return new Promise((resolve, reject) => {
+      const video = document.createElement("video");
+      let settled = false;
+
+      const cleanup = (): void => {
+        video.removeEventListener("loadeddata", onLoadedData);
+        video.removeEventListener("error", onError);
+      };
+
+      const fail = (reason: unknown): void => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        cleanup();
+        video.pause();
+        video.removeAttribute("src");
+        video.load();
+        reject(reason);
+      };
+
+      const onError = (): void => {
+        fail(new Error(`Failed to load video: ${url}`));
+      };
+
+      const onLoadedData = (): void => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        cleanup();
+        video.pause();
+        video.currentTime = 0;
+        const texture = new THREE.VideoTexture(video);
+        resolve({ video, texture });
+      };
+
+      video.muted = true;
+      video.loop = true;
+      video.playsInline = true;
+      video.autoplay = false;
+      video.preload = "auto";
+      video.crossOrigin = "anonymous";
+
+      video.addEventListener("loadeddata", onLoadedData);
+      video.addEventListener("error", onError);
+      video.src = url;
+      video.load();
+    });
+  }
+
+  function loadDefaultSeedImage(): void {
+    const urls = buildDefaultSeedImageUrls();
 
     const tryLoad = (index: number): void => {
       if (index >= urls.length) {
-        seedImageTexture = null;
-        displayMaterial.uniforms.uSeedImage.value = null;
-        displayMaterial.uniforms.uSeedVisible.value = 0.0;
-        displayMaterial.uniforms.uSeedSize.value.set(1, 1);
-        seedDensityMaterial.uniforms.uSeed.value = null;
-        seedDensityMaterial.uniforms.uSeedSize.value.set(1, 1);
-        forcesMaterial.uniforms.uSeedImage.value = null;
-        forcesMaterial.uniforms.uSeedSize.value.set(0, 0);
+        clearSeedImageBindings();
         console.warn(
           `[DigitalSmoke] Seed image not found. Place one in public as ${DEFAULT_SEED_IMAGE_CANDIDATES.join(", ")}`
         );
         return;
       }
 
-      loader.load(
-        urls[index],
-        (texture) => {
-          if (disposed) {
-            texture.dispose();
-            return;
-          }
-
-          texture.colorSpace = THREE.SRGBColorSpace;
-          texture.minFilter = THREE.LinearFilter;
-          texture.magFilter = THREE.LinearFilter;
-          texture.wrapS = THREE.ClampToEdgeWrapping;
-          texture.wrapT = THREE.ClampToEdgeWrapping;
-          texture.generateMipmaps = false;
-          texture.needsUpdate = true;
-          const texW = Math.max(1, Number((texture.image as { width?: number }).width ?? 1));
-          const texH = Math.max(1, Number((texture.image as { height?: number }).height ?? 1));
-
-          if (seedImageTexture) {
-            seedImageTexture.dispose();
-          }
-
-          seedImageTexture = texture;
-          displayMaterial.uniforms.uSeedImage.value = texture;
-          displayMaterial.uniforms.uSeedVisible.value = 1.0;
-          displayMaterial.uniforms.uSeedSize.value.set(texW, texH);
-          seedDensityMaterial.uniforms.uSeed.value = texture;
-          seedDensityMaterial.uniforms.uSeedSize.value.set(texW, texH);
-          forcesMaterial.uniforms.uSeedImage.value = texture;
-          forcesMaterial.uniforms.uSeedSize.value.set(texW, texH);
-          resetState(currentSeed);
-          console.info(`[DigitalSmoke] Loaded seed image: ${urls[index]}`);
-        },
-        undefined,
-        () => {
+      loadTextureFromUrl(urls[index])
+        .then((texture) => {
+          applySeedTexture(texture, urls[index]);
+        })
+        .catch(() => {
           tryLoad(index + 1);
-        }
-      );
+        });
     };
 
     tryLoad(0);
+  }
+
+  function loadDefaultSeedMorphImage(): void {
+    const urls = buildDefaultSeedMorphUrls();
+    const tryLoad = (index: number): void => {
+      if (index >= urls.length) {
+        syncMorphFallbackToBase();
+        console.warn(
+          `[DigitalSmoke] Morph seed image not found. Place one in public as ${DEFAULT_SEED_MORPH_CANDIDATES.join(", ")}`
+        );
+        return;
+      }
+
+      loadTextureFromUrl(urls[index])
+        .then((texture) => {
+          applySeedMorphTexture(texture, urls[index]);
+        })
+        .catch(() => {
+          tryLoad(index + 1);
+        });
+    };
+
+    tryLoad(0);
+  }
+
+  function loadDefaultSeedVideo(): void {
+    const urls = buildDefaultSeedVideoUrls();
+    const tryLoad = (index: number): void => {
+      if (index >= urls.length) {
+        console.warn(
+          `[DigitalSmoke] Seed video not found. Place one in public as ${DEFAULT_SEED_VIDEO_CANDIDATES.join(", ")}`
+        );
+        return;
+      }
+
+      loadVideoTextureFromUrl(urls[index])
+        .then(({ video, texture }) => {
+          applySeedVideoTexture(video, texture, urls[index]);
+        })
+        .catch(() => {
+          tryLoad(index + 1);
+        });
+    };
+
+    tryLoad(0);
+  }
+
+  function loadSeedImageFromFile(file: File): Promise<void> {
+    if (!file || !file.type.startsWith("image/")) {
+      return Promise.reject(new Error("Please choose an image file."));
+    }
+
+    const objectUrl = URL.createObjectURL(file);
+    return loadTextureFromUrl(objectUrl)
+      .then((texture) => {
+        URL.revokeObjectURL(objectUrl);
+        applySeedTexture(texture, file.name);
+      })
+      .catch((error) => {
+        URL.revokeObjectURL(objectUrl);
+        throw error;
+      });
+  }
+
+  function loadSeedVideoFromFile(file: File): Promise<void> {
+    if (!file || !file.type.startsWith("video/")) {
+      return Promise.reject(new Error("Please choose a video file."));
+    }
+
+    const objectUrl = URL.createObjectURL(file);
+    return loadVideoTextureFromUrl(objectUrl)
+      .then(({ video, texture }) => {
+        applySeedVideoTexture(video, texture, file.name, objectUrl);
+      })
+      .catch((error) => {
+        URL.revokeObjectURL(objectUrl);
+        throw error;
+      });
+  }
+
+  function updateSeedVideoPlayback(dt: number): void {
+    if (!seedVideoElement || !seedVideoTexture) {
+      return;
+    }
+
+    const duration = seedVideoElement.duration;
+    if (!Number.isFinite(duration) || duration <= 0) {
+      return;
+    }
+
+    const speed = THREE.MathUtils.clamp(seedVideoMotion, 0, 4);
+    if (speed <= 1e-5) {
+      return;
+    }
+
+    const advance = dt * speed;
+    let nextTime = seedVideoElement.currentTime + advance;
+    if (nextTime >= duration) {
+      nextTime %= duration;
+    }
+
+    seedVideoElement.currentTime = nextTime;
+    seedVideoTexture.needsUpdate = true;
   }
 
   function applyVelocitySplat(point: THREE.Vector2, add: THREE.Vector2, radius: number, gain: number): void {
@@ -1854,6 +2308,7 @@ export function createSmokeSystem(
   rebuildTargets();
   resetState(currentSeed);
   loadDefaultSeedImage();
+  loadDefaultSeedMorphImage();
 
   return {
     update(dt: number, elapsed: number): void {
@@ -1865,6 +2320,8 @@ export function createSmokeSystem(
       if (clampedDt <= 0) {
         return;
       }
+
+      updateSeedVideoPlayback(clampedDt);
 
       const substeps = 2;
       const stepDt = clampedDt / substeps;
@@ -1957,6 +2414,51 @@ export function createSmokeSystem(
       applyPlaneLook(0.35);
     },
 
+    setSeedMorph(value: number): void {
+      if (disposed) {
+        return;
+      }
+      applySeedMorphAmount(value);
+    },
+
+    setSeedImageFromFile(file: File): Promise<void> {
+      if (disposed) {
+        return Promise.resolve();
+      }
+      return loadSeedImageFromFile(file);
+    },
+
+    setSeedVideoFromFile(file: File): Promise<void> {
+      if (disposed) {
+        return Promise.resolve();
+      }
+      return loadSeedVideoFromFile(file);
+    },
+
+    setSeedVideoMotion(speed: number): void {
+      if (disposed) {
+        return;
+      }
+      seedVideoMotion = THREE.MathUtils.clamp(Number.isFinite(speed) ? speed : 1, 0, 4);
+    },
+
+    useDefaultSeedImage(): void {
+      if (disposed) {
+        return;
+      }
+      loadDefaultSeedImage();
+      loadDefaultSeedMorphImage();
+      applySeedMorphAmount(0);
+    },
+
+    useDefaultSeedVideo(): void {
+      if (disposed) {
+        return;
+      }
+      loadDefaultSeedVideo();
+      applySeedMorphAmount(0);
+    },
+
     reset(nextSeed?: number): void {
       if (disposed) {
         return;
@@ -1992,6 +2494,24 @@ export function createSmokeSystem(
       if (seedImageTexture) {
         seedImageTexture.dispose();
         seedImageTexture = null;
+      }
+      if (seedMorphTexture) {
+        seedMorphTexture.dispose();
+        seedMorphTexture = null;
+      }
+      if (seedVideoTexture) {
+        seedVideoTexture.dispose();
+        seedVideoTexture = null;
+      }
+      if (seedVideoElement) {
+        seedVideoElement.pause();
+        seedVideoElement.removeAttribute("src");
+        seedVideoElement.load();
+        seedVideoElement = null;
+      }
+      if (seedVideoObjectUrl) {
+        URL.revokeObjectURL(seedVideoObjectUrl);
+        seedVideoObjectUrl = null;
       }
       displayMaterial.dispose();
       clearMaterial.dispose();

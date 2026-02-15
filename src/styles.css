@@ -23,7 +23,7 @@ body,
 
 #app {
   position: relative;
-  background: radial-gradient(circle at 50% -22%, rgba(54, 58, 66, 0.17), rgba(0, 0, 0, 0.92) 44%, #000 100%);
+  background: #000;
 }
 
 .viewport {
