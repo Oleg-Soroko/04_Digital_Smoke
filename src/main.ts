@@ -112,6 +112,11 @@ const pointerState: PointerState = {
 let pointerDown = false;
 
 let ui: SmokeControlPanel;
+function exportScreenshot(): void {
+  renderer.render(scene, camera);
+  void capturePng(renderer, "digital_smoke");
+}
+
 ui = createControlsPanel(activeParams, activeSeed, {
   onParamsChange(next) {
     activeParams = { ...activeParams, ...next };
@@ -161,7 +166,7 @@ ui = createControlsPanel(activeParams, activeSeed, {
   },
 
   onScreenshot() {
-    void capturePng(renderer, "digital_smoke");
+    exportScreenshot();
   }
 }, useLegacyTilt);
 
@@ -363,7 +368,7 @@ function onKeyDown(event: KeyboardEvent): void {
   }
 
   if (event.code === "KeyP") {
-    void capturePng(renderer, "digital_smoke");
+    exportScreenshot();
   }
 }
 

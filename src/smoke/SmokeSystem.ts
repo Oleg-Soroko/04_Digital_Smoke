@@ -46,6 +46,7 @@ function clampParams(params: SmokeParams): SmokeParams {
     emitRate: clampValue("emitRate", params.emitRate),
     seedInfluence: clampValue("seedInfluence", params.seedInfluence),
     seedContrast: clampValue("seedContrast", params.seedContrast),
+    seedHue: clampValue("seedHue", params.seedHue),
     seedColorFilter: clampValue("seedColorFilter", params.seedColorFilter),
     seedParallax: clampValue("seedParallax", params.seedParallax),
     seedPulseShift: clampValue("seedPulseShift", params.seedPulseShift),
@@ -88,7 +89,8 @@ function clampParams(params: SmokeParams): SmokeParams {
     asciiStyle,
     pointerDarkness: clampValue("pointerDarkness", params.pointerDarkness),
     pointerForce: clampValue("pointerForce", params.pointerForce),
-    pointerRadius: clampValue("pointerRadius", params.pointerRadius)
+    pointerRadius: clampValue("pointerRadius", params.pointerRadius),
+    pointerTrail: clampValue("pointerTrail", params.pointerTrail)
   };
 }
 
@@ -630,6 +632,7 @@ uniform float uAsciiFlowDistort;
 uniform float uAsciiStyle;
 uniform float uSeedInfluence;
 uniform float uSeedContrast;
+uniform float uSeedHue;
 uniform float uSeedColorFilter;
 uniform float uSeedParallax;
 uniform float uSeedPulseShift;
@@ -648,6 +651,11 @@ float hash21(vec2 p) {
   p = fract(p * vec2(123.34, 456.21));
   p += dot(p, p + 45.32);
   return fract(p.x * p.y);
+}
+
+vec3 hueToRgb(float hue) {
+  vec3 rgb = clamp(abs(mod(hue * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0, 0.0, 1.0);
+  return rgb * rgb * (3.0 - 2.0 * rgb);
 }
 
 vec2 decodeVelocity(vec4 c) {
@@ -1002,14 +1010,20 @@ void main() {
   vec3 coolFilter = vec3(0.58, 0.88, 1.32);
   vec3 filterTarget = uSeedColorFilter >= 0.0 ? warmFilter : coolFilter;
   float globalFilterStrength = filterAmount * 0.68;
+  float hueAmount = clamp(abs(uSeedHue), 0.0, 1.0);
+  float hueWheel = fract(uSeedHue * 0.5 + 0.5);
+  vec3 hueFilterTarget = mix(vec3(1.0), hueToRgb(hueWheel), 0.92);
+  float hueStrength = hueAmount * 0.9;
   vec3 globalFilter = mix(vec3(1.0), filterTarget, globalFilterStrength);
+  globalFilter = mix(globalFilter, globalFilter * hueFilterTarget, hueStrength);
   color *= globalFilter;
 
   float seedCloud = seedPointCloudLayer(planeCoord, vUv);
   float localFlow = length(decodeVelocity(texture2D(uVelocity, vUv)));
   float seedGlow = seedCloud * (0.58 + smoke * 0.42 + detail * 0.18 + localFlow * 0.16);
-  float pointFilterStrength = min(1.0, globalFilterStrength + filterAmount * 0.24);
+  float pointFilterStrength = min(1.0, globalFilterStrength + filterAmount * 0.24 + hueStrength * 0.26);
   vec3 pointFilter = mix(vec3(1.0), filterTarget, pointFilterStrength);
+  pointFilter = mix(pointFilter, pointFilter * hueFilterTarget, hueStrength);
   float pointLum = dot(pointFilter, vec3(0.299, 0.587, 0.114));
   pointFilter = mix(vec3(pointLum), pointFilter, 1.18);
   vec3 seedColor = vec3(clamp(seedGlow * uSeedPointBrightness, 0.0, 1.0)) * uSeedBgOpacity * pointFilter;
@@ -1323,6 +1337,7 @@ export function createSmokeSystem(
       uAsciiStyle: { value: state.asciiStyle },
       uSeedInfluence: { value: state.seedInfluence },
       uSeedContrast: { value: state.seedContrast },
+      uSeedHue: { value: state.seedHue },
       uSeedColorFilter: { value: state.seedColorFilter },
       uSeedParallax: { value: state.seedParallax },
       uSeedPulseShift: { value: state.seedPulseShift },
@@ -2233,11 +2248,12 @@ export function createSmokeSystem(
     if (pointer.active) {
       pointerPoint.set(pointer.x, pointer.y);
       const pointerInk = pointer.ink >= 0 ? 1 : -1;
-      const holdAdd = state.pointerForce * dt * 0.35;
-      const moveAdd = Math.min(0.24, pointerLength * state.pointerForce * 2.8);
+      const trail = state.pointerTrail;
+      const holdAdd = state.pointerForce * dt * 0.35 * trail;
+      const moveAdd = Math.min(0.24 * trail, pointerLength * state.pointerForce * 2.8 * trail);
       const densityAddRaw = holdAdd + moveAdd;
       const densityGain = pointerInk > 0 ? 1.0 : state.pointerDarkness;
-      const densityAdd = Math.min(0.35, densityAddRaw) * densityGain * pointerInk;
+      const densityAdd = Math.min(0.35 * trail, densityAddRaw) * densityGain * pointerInk;
       applyDensitySplat(pointerPoint, state.pointerRadius * (pointerInk > 0 ? 1.3 : 1.55), densityAdd);
     }
 
@@ -2270,6 +2286,7 @@ export function createSmokeSystem(
     displayMaterial.uniforms.uAsciiStyle.value = state.asciiStyle;
     displayMaterial.uniforms.uSeedInfluence.value = state.seedInfluence;
     displayMaterial.uniforms.uSeedContrast.value = state.seedContrast;
+    displayMaterial.uniforms.uSeedHue.value = state.seedHue;
     displayMaterial.uniforms.uSeedColorFilter.value = state.seedColorFilter;
     displayMaterial.uniforms.uSeedParallax.value = state.seedParallax;
     displayMaterial.uniforms.uSeedPulseShift.value = state.seedPulseShift;
@@ -2341,6 +2358,7 @@ export function createSmokeSystem(
         emitRate: next.emitRate ?? state.emitRate,
         seedInfluence: next.seedInfluence ?? state.seedInfluence,
         seedContrast: next.seedContrast ?? state.seedContrast,
+        seedHue: next.seedHue ?? state.seedHue,
         seedColorFilter: next.seedColorFilter ?? state.seedColorFilter,
         seedParallax: next.seedParallax ?? state.seedParallax,
         seedPulseShift: next.seedPulseShift ?? state.seedPulseShift,
@@ -2383,7 +2401,8 @@ export function createSmokeSystem(
         asciiStyle: next.asciiStyle ?? state.asciiStyle,
         pointerDarkness: next.pointerDarkness ?? state.pointerDarkness,
         pointerForce: next.pointerForce ?? state.pointerForce,
-        pointerRadius: next.pointerRadius ?? state.pointerRadius
+        pointerRadius: next.pointerRadius ?? state.pointerRadius,
+        pointerTrail: next.pointerTrail ?? state.pointerTrail
       });
 
       const resolutionChanged = nextState.simResolution !== state.simResolution;

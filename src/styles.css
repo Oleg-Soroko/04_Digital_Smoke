@@ -4,6 +4,28 @@
   --hint-fg: rgba(222, 227, 233, 0.76);
   --hint-bg: rgba(7, 7, 9, 0.55);
   --font-ui: "Space Grotesk", "Segoe UI", Tahoma, sans-serif;
+  --ui-scale: 1.05;
+  --ui-panel-opacity: 0.37;
+  --ui-panel-blur: 3px;
+  --ui-panel-border-alpha: 0;
+  --ui-widget-alpha: 0;
+  --ui-title-alpha: 0;
+  --ui-text-rgb: 128, 128, 128;
+  --ui-text-alpha: 0.92;
+  --ui-number-rgb: 128, 128, 128;
+  --ui-number-alpha: 0.95;
+  --ui-slider-track-rgb: 128, 128, 128;
+  --ui-slider-track-alpha: 0.34;
+  --ui-slider-fill-rgb: 128, 128, 128;
+  --ui-slider-fill-alpha: 0.98;
+  --ui-slider-knob-rgb: 128, 128, 128;
+  --ui-slider-knob-alpha: 1;
+  --ui-slider-knob-border-rgb: 128, 128, 128;
+  --ui-slider-knob-border-alpha: 0;
+  --ui-slider-knob-chamfer: 1.5px;
+  --ui-slider-knob-bevel-alpha: 0.3;
+  --ui-slider-thickness: 1px;
+  --ui-slider-knob-size: 8.75px;
 }
 
 * {
@@ -45,21 +67,144 @@ body,
   font-size: 12px;
   line-height: 1.35;
   letter-spacing: 0.02em;
-  backdrop-filter: blur(4px);
+  opacity: 1;
 }
 
 .lil-gui {
-  --background-color: var(--panel-bg);
-  --widget-color: rgba(255, 255, 255, 0.1);
-  --text-color: rgba(242, 244, 247, 0.92);
-  --title-background-color: rgba(255, 255, 255, 0.09);
-  --title-text-color: rgba(255, 255, 255, 0.9);
-  --number-color: rgba(214, 223, 232, 0.95);
-  border: 1px solid var(--panel-border);
-  border-radius: 10px;
+  --background-color: rgba(12, 13, 16, var(--ui-panel-opacity));
+  --widget-color: rgba(255, 255, 255, var(--ui-widget-alpha));
+  --text-color: rgba(var(--ui-text-rgb), var(--ui-text-alpha));
+  --title-background-color: rgba(255, 255, 255, var(--ui-title-alpha));
+  --title-text-color: rgba(var(--ui-text-rgb), var(--ui-text-alpha));
+  --number-color: rgba(var(--ui-number-rgb), var(--ui-number-alpha));
+  --font-size: 11px;
+  --input-font-size: 11px;
+  --widget-border-radius: 0px;
+  --slider-knob-width: 0px;
+  --padding: 4px;
+  --spacing: 4px;
+  border: 1px solid rgba(255, 255, 255, var(--ui-panel-border-alpha));
+  border-radius: 0;
   overflow: hidden;
   margin: 10px;
   pointer-events: auto;
+  backdrop-filter: blur(var(--ui-panel-blur));
+  -webkit-backdrop-filter: blur(var(--ui-panel-blur));
+  box-shadow: none;
+}
+
+.lil-gui.lil-root {
+  transform: scale(var(--ui-scale));
+  transform-origin: top right;
+}
+
+.lil-gui .lil-title {
+  border: 0 !important;
+  border-radius: 0;
+  letter-spacing: normal;
+  text-transform: none;
+  font-weight: 600;
+}
+
+.lil-gui .lil-title::before {
+  opacity: 0.65;
+}
+
+.lil-gui .lil-root > .lil-children > .lil-gui > .lil-title,
+.lil-gui .lil-gui .lil-gui > .lil-children {
+  border: 0 !important;
+}
+
+.lil-gui .lil-controller {
+  margin: 2px 0;
+  border: 0;
+}
+
+.lil-gui .lil-controller > .lil-name {
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.lil-gui input,
+.lil-gui button,
+.lil-gui .lil-controller.lil-option .lil-display {
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+.lil-gui input[type=text],
+.lil-gui input[type=number],
+.lil-gui .lil-controller button,
+.lil-gui .lil-controller.lil-option .lil-display {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.lil-gui .lil-controller button {
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.lil-gui .lil-controller button:hover,
+.lil-gui input:hover,
+.lil-gui .lil-controller.lil-option .lil-widget:hover .lil-display {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.lil-gui .lil-controller.lil-number .lil-widget {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+.lil-gui .lil-controller.lil-number .lil-slider {
+  position: relative;
+  height: var(--ui-slider-thickness);
+  margin: 0 6px;
+  align-self: center;
+  border-radius: 0;
+  background: rgba(var(--ui-slider-track-rgb), var(--ui-slider-track-alpha));
+  padding-right: 0;
+  overflow: visible;
+}
+
+.lil-gui .lil-controller.lil-number .lil-fill {
+  position: relative;
+  height: 100%;
+  border-radius: 0;
+  border-right: 0;
+  background: rgba(var(--ui-slider-fill-rgb), var(--ui-slider-fill-alpha));
+}
+
+.lil-gui .lil-controller.lil-number .lil-fill::after {
+  content: "";
+  position: absolute;
+  right: calc(var(--ui-slider-knob-size) * -0.5);
+  top: 50%;
+  width: var(--ui-slider-knob-size);
+  height: var(--ui-slider-knob-size);
+  transform: translateY(-50%);
+  border-radius: 0;
+  clip-path: polygon(
+    var(--ui-slider-knob-chamfer) 0,
+    calc(100% - var(--ui-slider-knob-chamfer)) 0,
+    100% var(--ui-slider-knob-chamfer),
+    100% calc(100% - var(--ui-slider-knob-chamfer)),
+    calc(100% - var(--ui-slider-knob-chamfer)) 100%,
+    var(--ui-slider-knob-chamfer) 100%,
+    0 calc(100% - var(--ui-slider-knob-chamfer)),
+    0 var(--ui-slider-knob-chamfer)
+  );
+  background: rgba(var(--ui-slider-knob-rgb), var(--ui-slider-knob-alpha));
+  border: 1px solid rgba(var(--ui-slider-knob-border-rgb), var(--ui-slider-knob-border-alpha));
+  box-shadow:
+    inset 1px 1px 0 rgba(255, 255, 255, var(--ui-slider-knob-bevel-alpha)),
+    inset -1px -1px 0 rgba(0, 0, 0, var(--ui-slider-knob-bevel-alpha));
+}
+
+.lil-gui .lil-controller.lil-number .lil-slider:hover .lil-fill::after,
+.lil-gui .lil-controller.lil-number .lil-slider.lil-active .lil-fill::after {
+  background: #ffffff;
 }
 
 @media (max-width: 860px) {

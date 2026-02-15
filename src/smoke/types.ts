@@ -3,6 +3,7 @@ export interface SmokeParams {
   emitRate: number;
   seedInfluence: number;
   seedContrast: number;
+  seedHue: number;
   seedColorFilter: number;
   seedParallax: number;
   seedPulseShift: number;
@@ -46,6 +47,7 @@ export interface SmokeParams {
   pointerDarkness: number;
   pointerForce: number;
   pointerRadius: number;
+  pointerTrail: number;
 }
 
 export type ParamRange = {
@@ -58,13 +60,14 @@ export const SMOKE_PARAM_LIMITS: Record<keyof SmokeParams, ParamRange> = {
   simResolution: { min: 64, max: 448, step: 32 },
   emitRate: { min: 0.0, max: 1.2, step: 0.01 },
   seedInfluence: { min: 0.0, max: 8.0, step: 0.05 },
-  seedContrast: { min: 0.2, max: 4.0, step: 0.01 },
+  seedContrast: { min: 0.2, max: 1.3, step: 0.01 },
+  seedHue: { min: -1.0, max: 1.0, step: 0.01 },
   seedColorFilter: { min: -1.0, max: 1.0, step: 0.01 },
   seedParallax: { min: 0.0, max: 0.12, step: 0.0005 },
   seedPulseShift: { min: 0.0, max: 0.08, step: 0.0005 },
   seedPulseSpeed: { min: 0.1, max: 6.0, step: 0.01 },
   seedPointBrightness: { min: 0.2, max: 3.2, step: 0.01 },
-  seedPointSize: { min: 0.4, max: 2.6, step: 0.01 },
+  seedPointSize: { min: 0.5, max: 1.5, step: 0.01 },
   seedPointContrast: { min: 0.3, max: 3.5, step: 0.01 },
   seedPointerInfluence: { min: 0.0, max: 4.0, step: 0.01 },
   planeTilt: { min: 0.0, max: 0.45, step: 0.005 },
@@ -101,7 +104,8 @@ export const SMOKE_PARAM_LIMITS: Record<keyof SmokeParams, ParamRange> = {
   asciiStyle: { min: 0, max: 4, step: 1 },
   pointerDarkness: { min: 0.0, max: 0.62, step: 0.01 },
   pointerForce: { min: 0.8, max: 8.0, step: 0.1 },
-  pointerRadius: { min: 0.001, max: 0.018, step: 0.0005 }
+  pointerRadius: { min: 0.001, max: 0.018, step: 0.0005 },
+  pointerTrail: { min: 0.2, max: 4.0, step: 0.01 }
 };
 
 export const DEFAULT_SMOKE_PARAMS: SmokeParams = {
@@ -109,6 +113,7 @@ export const DEFAULT_SMOKE_PARAMS: SmokeParams = {
   emitRate: 0.2,
   seedInfluence: 3.2,
   seedContrast: 0.7,
+  seedHue: 0.0,
   seedColorFilter: 0.0,
   seedParallax: 0.02,
   seedPulseShift: 0.01,
@@ -151,5 +156,6 @@ export const DEFAULT_SMOKE_PARAMS: SmokeParams = {
   asciiStyle: 2,
   pointerDarkness: 0.31,
   pointerForce: 4.4,
-  pointerRadius: 0.0095
+  pointerRadius: 0.0095,
+  pointerTrail: 1.0
 };
