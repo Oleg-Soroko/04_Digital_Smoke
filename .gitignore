@@ -1,0 +1,5 @@
+# GitHub Pages deployment branch
+.DS_Store
+Thumbs.db
+*.log
+
