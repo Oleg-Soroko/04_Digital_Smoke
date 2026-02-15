@@ -1,0 +1,75 @@
+:root {
+  --panel-bg: rgba(12, 13, 16, 0.82);
+  --panel-border: rgba(255, 255, 255, 0.14);
+  --hint-fg: rgba(222, 227, 233, 0.76);
+  --hint-bg: rgba(7, 7, 9, 0.55);
+  --font-ui: "Space Grotesk", "Segoe UI", Tahoma, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: #000;
+  font-family: var(--font-ui);
+}
+
+#app {
+  position: relative;
+  background: radial-gradient(circle at 50% -22%, rgba(54, 58, 66, 0.17), rgba(0, 0, 0, 0.92) 44%, #000 100%);
+}
+
+.viewport {
+  position: absolute;
+  inset: 0;
+}
+
+.controls-hint {
+  position: fixed;
+  left: 12px;
+  bottom: 12px;
+  z-index: 5;
+  pointer-events: none;
+  color: var(--hint-fg);
+  background: var(--hint-bg);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.35;
+  letter-spacing: 0.02em;
+  backdrop-filter: blur(4px);
+}
+
+.lil-gui {
+  --background-color: var(--panel-bg);
+  --widget-color: rgba(255, 255, 255, 0.1);
+  --text-color: rgba(242, 244, 247, 0.92);
+  --title-background-color: rgba(255, 255, 255, 0.09);
+  --title-text-color: rgba(255, 255, 255, 0.9);
+  --number-color: rgba(214, 223, 232, 0.95);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  overflow: hidden;
+  margin: 10px;
+  pointer-events: auto;
+}
+
+@media (max-width: 860px) {
+  .lil-gui {
+    max-width: calc(100vw - 20px);
+    margin: 8px;
+  }
+
+  .controls-hint {
+    font-size: 11px;
+    padding: 6px 8px;
+  }
+}

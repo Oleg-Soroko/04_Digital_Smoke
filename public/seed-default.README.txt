@@ -1,0 +1,9 @@
+Place your start image here as:
+D:\CODEX\PROJECTS\04_Digital_Smoke\public\seed-default.png
+
+Expected image:
+- grayscale or RGB
+- black background, bright/white subject
+- square recommended (1024x1024)
+
+On app start/reset, this image is injected into density as the initial smoke shape.
