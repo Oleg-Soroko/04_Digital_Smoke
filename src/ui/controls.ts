@@ -6,6 +6,7 @@ export interface SmokeControlCallbacks {
   onPauseChange(paused: boolean): void;
   onResetSeed(seed: number): void;
   onResetParams(next: SmokeParams): void;
+  onTiltLegacyChange(legacy: boolean): void;
   onScreenshot(): void;
 }
 
@@ -18,6 +19,7 @@ export interface SmokeControlPanel {
 type UiState = SmokeParams & {
   paused: boolean;
   seed: number;
+  tiltLegacy: boolean;
 };
 
 const MAX_SEED = 2147483646;
@@ -25,14 +27,16 @@ const MAX_SEED = 2147483646;
 export function createControlsPanel(
   initialParams: SmokeParams,
   initialSeed: number,
-  callbacks: SmokeControlCallbacks
+  callbacks: SmokeControlCallbacks,
+  initialTiltLegacy = false
 ): SmokeControlPanel {
   const defaults = { ...DEFAULT_SMOKE_PARAMS };
 
   const state: UiState = {
     ...initialParams,
     paused: false,
-    seed: Math.max(1, Math.floor(initialSeed))
+    seed: Math.max(1, Math.floor(initialSeed)),
+    tiltLegacy: Boolean(initialTiltLegacy)
   };
 
   const gui = new GUI({
@@ -42,9 +46,9 @@ export function createControlsPanel(
 
   const paramControllers: Array<{ updateDisplay: () => void }> = [];
 
-  function addParamController<K extends keyof SmokeParams>(key: K, label: string): void {
+  function addParamController<K extends keyof SmokeParams>(parent: GUI, key: K, label: string): void {
     const limits = SMOKE_PARAM_LIMITS[key];
-    const controller = gui.add(state, key, limits.min, limits.max, limits.step).name(label);
+    const controller = parent.add(state, key, limits.min, limits.max, limits.step).name(label);
 
     controller.onChange((value: number) => {
       const normalized =
@@ -64,45 +68,47 @@ export function createControlsPanel(
     paramControllers.push(controller);
   }
 
-  addParamController("simResolution", "Sim Resolution");
-  addParamController("emitRate", "Emission");
-  addParamController("seedInfluence", "Seed Influence");
-  addParamController("seedContrast", "Image Contrast");
-  addParamController("seedColorFilter", "Color Filter");
-  addParamController("seedParallax", "Point Parallax");
-  addParamController("seedPulseShift", "Pulse Shift");
-  addParamController("seedPulseSpeed", "Pulse Speed");
-  addParamController("seedPointBrightness", "Image Pt Bright");
-  addParamController("seedPointSize", "Image Pt Size");
-  addParamController("seedPointContrast", "Image Pt Contrast");
-  addParamController("seedPointerInfluence", "Image Pt Pointer");
-  addParamController("sourceRadius", "Source Radius");
-  addParamController("densityDissipation", "Density Keep");
-  addParamController("velocityDissipation", "Velocity Keep");
-  addParamController("buoyancy", "Buoyancy");
-  addParamController("vorticity", "Vorticity");
-  addParamController("pressureIterations", "Pressure Iter.");
-  addParamController("noiseScale", "Noise Scale");
-  addParamController("turbulence", "Turbulence");
-  addParamController("advection", "Advection");
-  addParamController("drag", "Drag");
-  addParamController("opacity", "Opacity");
-  addParamController("contrast", "Contrast");
-  addParamController("persistence", "Persistence");
-  addParamController("detailBoost", "Detail Boost");
-  addParamController("shadowBoost", "Shadow Boost");
-  addParamController("highlightBoost", "Highlight Boost");
-  addParamController("asciiScale", "Point Size");
-  addParamController("asciiLayers", "Point Layers");
-  addParamController("asciiBlend", "Point Density");
-  addParamController("asciiMix", "ASCII Mix");
-  addParamController("asciiJitter", "Point Jitter");
-  addParamController("asciiSpacingX", "ASCII Spacing X");
-  addParamController("asciiSpacingY", "ASCII Spacing Y");
-  addParamController("asciiThreshold", "Glyph Threshold");
-  addParamController("asciiFlowDistort", "Flow Distort");
+  const simulationFolder = gui.addFolder("Simulation");
+  addParamController(simulationFolder, "simResolution", "Sim Resolution");
+  addParamController(simulationFolder, "emitRate", "Emission");
+  addParamController(simulationFolder, "sourceRadius", "Source Radius");
+  addParamController(simulationFolder, "densityDissipation", "Density Keep");
+  addParamController(simulationFolder, "velocityDissipation", "Velocity Keep");
+  addParamController(simulationFolder, "buoyancy", "Buoyancy");
+  addParamController(simulationFolder, "vorticity", "Vorticity");
+  addParamController(simulationFolder, "pressureIterations", "Pressure Iter.");
+  addParamController(simulationFolder, "noiseScale", "Noise Scale");
+  addParamController(simulationFolder, "turbulence", "Turbulence");
+  addParamController(simulationFolder, "advection", "Advection");
+  addParamController(simulationFolder, "drag", "Drag");
+  addParamController(simulationFolder, "persistence", "Persistence");
 
-  const styleController = gui
+  const imageFolder = gui.addFolder("Image Source");
+  addParamController(imageFolder, "seedInfluence", "Seed Influence");
+  addParamController(imageFolder, "seedContrast", "Image Contrast");
+  addParamController(imageFolder, "seedColorFilter", "Color Filter");
+
+  const imagePointsFolder = gui.addFolder("Image Points");
+  addParamController(imagePointsFolder, "seedPointBrightness", "Point Bright");
+  addParamController(imagePointsFolder, "seedPointSize", "Point Size");
+  addParamController(imagePointsFolder, "seedPointContrast", "Point Contrast");
+  addParamController(imagePointsFolder, "seedPointerInfluence", "Pointer Influence");
+  addParamController(imagePointsFolder, "seedParallax", "Parallax");
+  addParamController(imagePointsFolder, "seedPulseShift", "Pulse Shift");
+  addParamController(imagePointsFolder, "seedPulseSpeed", "Pulse Speed");
+
+  const asciiFolder = gui.addFolder("ASCII");
+  addParamController(asciiFolder, "asciiScale", "Point Size");
+  addParamController(asciiFolder, "asciiLayers", "Point Layers");
+  addParamController(asciiFolder, "asciiBlend", "Point Density");
+  addParamController(asciiFolder, "asciiMix", "ASCII Mix");
+  addParamController(asciiFolder, "asciiJitter", "Point Jitter");
+  addParamController(asciiFolder, "asciiSpacingX", "Spacing X");
+  addParamController(asciiFolder, "asciiSpacingY", "Spacing Y");
+  addParamController(asciiFolder, "asciiThreshold", "Glyph Threshold");
+  addParamController(asciiFolder, "asciiFlowDistort", "Flow Distort");
+
+  const styleController = asciiFolder
     .add(state, "asciiStyle", { Mono: 0, Dust: 1, Glitch: 2, Ghost: 3, Fat: 4 })
     .name("Point Style");
   styleController.onChange((value: number | string) => {
@@ -112,11 +118,25 @@ export function createControlsPanel(
   });
   paramControllers.push(styleController);
 
-  addParamController("pointerDarkness", "RMB Darkness");
-  addParamController("pointerForce", "Pointer Force");
-  addParamController("pointerRadius", "Pointer Scale");
+  const interactionFolder = gui.addFolder("Interaction");
+  addParamController(interactionFolder, "planeTilt", "Plane Tilt");
+  addParamController(interactionFolder, "planeTiltEase", "Tilt Follow");
+  const legacyTiltController = interactionFolder.add(state, "tiltLegacy").name("Legacy Tilt");
+  legacyTiltController.onChange((value: boolean) => {
+    callbacks.onTiltLegacyChange(Boolean(value));
+  });
+  addParamController(interactionFolder, "pointerDarkness", "RMB Darkness");
+  addParamController(interactionFolder, "pointerForce", "Pointer Force");
+  addParamController(interactionFolder, "pointerRadius", "Pointer Scale");
 
-  const pauseController = gui.add(state, "paused").name("Pause");
+  const lookFolder = gui.addFolder("Look");
+  addParamController(lookFolder, "opacity", "Opacity");
+  addParamController(lookFolder, "contrast", "Contrast");
+  addParamController(lookFolder, "detailBoost", "Detail Boost");
+  addParamController(lookFolder, "shadowBoost", "Shadow Boost");
+  addParamController(lookFolder, "highlightBoost", "Highlight Boost");
+
+  const pauseController = interactionFolder.add(state, "paused").name("Pause");
   pauseController.onChange((value: boolean) => {
     callbacks.onPauseChange(Boolean(value));
   });

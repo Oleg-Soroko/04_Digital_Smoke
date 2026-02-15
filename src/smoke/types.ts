@@ -11,6 +11,8 @@ export interface SmokeParams {
   seedPointSize: number;
   seedPointContrast: number;
   seedPointerInfluence: number;
+  planeTilt: number;
+  planeTiltEase: number;
   sourceRadius: number;
   densityDissipation: number;
   velocityDissipation: number;
@@ -65,6 +67,8 @@ export const SMOKE_PARAM_LIMITS: Record<keyof SmokeParams, ParamRange> = {
   seedPointSize: { min: 0.4, max: 2.6, step: 0.01 },
   seedPointContrast: { min: 0.3, max: 3.5, step: 0.01 },
   seedPointerInfluence: { min: 0.0, max: 4.0, step: 0.01 },
+  planeTilt: { min: 0.0, max: 0.45, step: 0.005 },
+  planeTiltEase: { min: 1.0, max: 25.0, step: 0.1 },
   sourceRadius: { min: 0.001, max: 0.019, step: 0.0005 },
   densityDissipation: { min: 0.984, max: 1.0, step: 0.0002 },
   velocityDissipation: { min: 0.924, max: 1.0, step: 0.001 },
@@ -104,7 +108,7 @@ export const DEFAULT_SMOKE_PARAMS: SmokeParams = {
   simResolution: 256,
   emitRate: 0.2,
   seedInfluence: 3.2,
-  seedContrast: 1.45,
+  seedContrast: 0.7,
   seedColorFilter: 0.0,
   seedParallax: 0.02,
   seedPulseShift: 0.01,
@@ -113,6 +117,8 @@ export const DEFAULT_SMOKE_PARAMS: SmokeParams = {
   seedPointSize: 1.0,
   seedPointContrast: 1.0,
   seedPointerInfluence: 1.0,
+  planeTilt: 0.11,
+  planeTiltEase: 8.5,
   sourceRadius: 0.01,
   densityDissipation: 0.992,
   velocityDissipation: 0.962,

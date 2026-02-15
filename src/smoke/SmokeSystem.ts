@@ -43,6 +43,8 @@ function clampParams(params: SmokeParams): SmokeParams {
     seedPointSize: clampValue("seedPointSize", params.seedPointSize),
     seedPointContrast: clampValue("seedPointContrast", params.seedPointContrast),
     seedPointerInfluence: clampValue("seedPointerInfluence", params.seedPointerInfluence),
+    planeTilt: clampValue("planeTilt", params.planeTilt),
+    planeTiltEase: clampValue("planeTiltEase", params.planeTiltEase),
     sourceRadius: clampValue("sourceRadius", params.sourceRadius),
     densityDissipation: clampValue("densityDissipation", params.densityDissipation),
     velocityDissipation: clampValue("velocityDissipation", params.velocityDissipation),
@@ -813,6 +815,7 @@ float seedPointCloudLayer(vec2 fragCoord, vec2 baseUv) {
 }
 
 void main() {
+  vec2 planeCoord = vUv * uResolution;
   float dC = texture2D(uDensity, vUv).r;
   float dL = texture2D(uDensity, vUv - vec2(uTexel.x, 0.0)).r;
   float dR = texture2D(uDensity, vUv + vec2(uTexel.x, 0.0)).r;
@@ -856,7 +859,7 @@ void main() {
     vec2 layerUv = clamp(vUv + layerDrift * uTexel * (0.35 + fi * 0.08), vec2(0.0), vec2(1.0));
 
     float layer = pointLayer(
-      gl_FragCoord.xy + layerDrift * cell,
+      planeCoord + layerDrift * cell,
       layerUv,
       cell,
       pointJitter * (0.6 + fi * 0.2),
@@ -897,7 +900,7 @@ void main() {
       vec2 layerUv = clamp(vUv + layerDrift * uTexel * (0.4 + fi * 0.08), vec2(0.0), vec2(1.0));
 
       float layer = asciiLayer(
-        gl_FragCoord.xy + layerDrift * cell,
+        planeCoord + layerDrift * cell,
         layerUv,
         cell,
         pointJitter * (0.5 + fi * 0.16),
@@ -925,7 +928,7 @@ void main() {
 
   float style = clamp(uAsciiStyle, 0.0, 4.0);
   float styleBlend = smoothstep(1.0, 4.0, style);
-  float scan = 0.5 + 0.5 * sin(gl_FragCoord.y * 0.33 + uTime * 8.0);
+  float scan = 0.5 + 0.5 * sin(planeCoord.y * 0.33 + uTime * 8.0);
   mixedSmoke *= 1.0 - styleBlend * 0.14 * scan;
 
   vec3 color = vec3(mixedSmoke);
@@ -941,7 +944,7 @@ void main() {
   }
 
   if (style > 2.5) {
-    float glitchLine = step(0.993, hash21(vec2(floor(gl_FragCoord.y * 0.25), floor(uTime * 30.0))));
+    float glitchLine = step(0.993, hash21(vec2(floor(planeCoord.y * 0.25), floor(uTime * 30.0))));
     color += vec3(glitchLine * 0.35);
   }
 
@@ -953,7 +956,7 @@ void main() {
   vec3 globalFilter = mix(vec3(1.0), filterTarget, globalFilterStrength);
   color *= globalFilter;
 
-  float seedCloud = seedPointCloudLayer(gl_FragCoord.xy, vUv);
+  float seedCloud = seedPointCloudLayer(planeCoord, vUv);
   float localFlow = length(decodeVelocity(texture2D(uVelocity, vUv)));
   float seedGlow = seedCloud * (0.58 + smoke * 0.42 + detail * 0.18 + localFlow * 0.16);
   float pointFilterStrength = min(1.0, globalFilterStrength + filterAmount * 0.24);
@@ -1457,7 +1460,7 @@ export function createSmokeSystem(
   const pointer: PointerState = {
     active: false,
     x: 0.5,
-    y: 0.14,
+    y: 0.5,
     dx: 0,
     dy: 0,
     ink: 1
@@ -1468,6 +1471,14 @@ export function createSmokeSystem(
   const parallaxPointer = new THREE.Vector2(0.5, 0.5);
   const parallaxTarget = new THREE.Vector2(0.5, 0.5);
   const clearColor = new THREE.Vector4();
+
+  function applyPlaneLook(follow: number): void {
+    const alpha = THREE.MathUtils.clamp(follow, 0.0, 1.0);
+    parallaxPointer.lerp(parallaxTarget, alpha);
+
+    displayMaterial.uniforms.uPointerUv.value.copy(parallaxPointer);
+    displayMaterial.uniforms.uPointerActive.value = pointer.active ? 1.0 : 0.0;
+  }
 
   function runPass(material: THREE.Material, target: THREE.WebGLRenderTarget): void {
     passMesh.material = material;
@@ -1777,12 +1788,11 @@ export function createSmokeSystem(
     }
 
     parallaxTarget.set(pointer.x, pointer.y);
-    const parallaxFollow = 1 - Math.exp(-dt * 8.0);
-    parallaxPointer.lerp(parallaxTarget, parallaxFollow);
+    const tiltFollow = 1 - Math.exp(-dt * (state.planeTiltEase * 1.35));
+    applyPlaneLook(tiltFollow);
 
     displayMaterial.uniforms.uDensity.value = density.read.texture;
     displayMaterial.uniforms.uVelocity.value = velocity.read.texture;
-    displayMaterial.uniforms.uPointerUv.value.copy(parallaxPointer);
     displayMaterial.uniforms.uTime.value = elapsed;
     displayMaterial.uniforms.uOpacity.value = state.opacity;
     displayMaterial.uniforms.uContrast.value = state.contrast;
@@ -1815,7 +1825,6 @@ export function createSmokeSystem(
     displayMaterial.uniforms.uSeedPointContrast.value = state.seedPointContrast;
     displayMaterial.uniforms.uSeedPointerInfluence.value = state.seedPointerInfluence;
     displayMaterial.uniforms.uPointerRadius.value = state.pointerRadius;
-    displayMaterial.uniforms.uPointerActive.value = pointer.active ? 1.0 : 0.0;
 
     renderer.setRenderTarget(null);
   }
@@ -1883,6 +1892,8 @@ export function createSmokeSystem(
         seedPointSize: next.seedPointSize ?? state.seedPointSize,
         seedPointContrast: next.seedPointContrast ?? state.seedPointContrast,
         seedPointerInfluence: next.seedPointerInfluence ?? state.seedPointerInfluence,
+        planeTilt: next.planeTilt ?? state.planeTilt,
+        planeTiltEase: next.planeTiltEase ?? state.planeTiltEase,
         sourceRadius: next.sourceRadius ?? state.sourceRadius,
         densityDissipation: next.densityDissipation ?? state.densityDissipation,
         velocityDissipation: next.velocityDissipation ?? state.velocityDissipation,
@@ -1941,6 +1952,9 @@ export function createSmokeSystem(
       pointer.dx = Math.min(1, Math.max(-1, nextPointer.dx));
       pointer.dy = Math.min(1, Math.max(-1, nextPointer.dy));
       pointer.ink = Math.min(1, Math.max(-1, nextPointer.ink));
+
+      parallaxTarget.set(pointer.x, pointer.y);
+      applyPlaneLook(0.35);
     },
 
     reset(nextSeed?: number): void {
